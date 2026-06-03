@@ -1,6 +1,6 @@
 <!--
 Assignment 1, SCSM2223-25262 (OrderForm.php)
-Group Name: ???
+Group Name: DNF
 -->
 <?php require 'libs/db_connect_PDO.php'; ?>
 
@@ -9,7 +9,21 @@ Group Name: ???
 $name = "";
 $email = "";
 $phone = "";
-// ???
+
+
+if (isset($_GET['email'])) {
+    $email = $_GET['email'];
+    try {
+        $stmt_user = $pdo->prepare("SELECT * FROM users WHERE email=:email");
+        $stmt_user->execute(['email' => $email]);
+        if ($row = $stmt_user->fetch()) {
+            $name = $row['name'];
+            $phone = $row['phone'];
+        }
+    } catch (PDOException $ex) {
+        echo "Database Error: " . $ex->getMessage();
+    }
+}
 
 // Start query foods and drinks from database here
 $stmt_food = $pdo->prepare("SELECT * FROM menus WHERE type='Food' ORDER BY name ");
