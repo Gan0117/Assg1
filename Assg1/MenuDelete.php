@@ -6,15 +6,32 @@ Group Name: ???
 <?php require 'libs/db_connect_PDO.php'; ?>
 <?php 
 $id = $_REQUEST['id'];
-$task = $_REQUEST['task'];
+// 使用 isset() 检查 task 是否存在，彻底解决第 9 行的报错警告
+$task = isset($_REQUEST['task']) ? $_REQUEST['task'] : "";
 
-// Proceed or cancel delete operation
 if ($task == "Delete" || $task == "Cancel") {
-  // ???
+    if ($task == "Cancel") {
+        header("Location: MenuManage.php");
+        exit;
+    } else if ($task == "Delete") {
+        $stmt_delete = $pdo->prepare("DELETE FROM menus WHERE id = :id");
+        try {
+            $stmt_delete->execute([':id' => $_POST['id']]);
+            header("Location: MenuManage.php");
+            exit;
+        } catch (PDOException $ex) {
+            echo "Database Error: " . $ex->getMessage();
+        }
+    }
 }
 
-// Query database to display menu info to be deleted
-// ???
+$stmt_select = $pdo->prepare("SELECT * FROM menus WHERE id = :id");
+try {
+    $stmt_select->execute([':id' => $id]);
+    $row = $stmt_select->fetch();
+} catch (PDOException $ex) {
+    echo "Database Error: " . $ex->getMessage();
+}
 ?>
 
 <!DOCTYPE html>
@@ -27,47 +44,42 @@ if ($task == "Delete" || $task == "Cancel") {
 
 <body>
 
-<!-- Main Layout Table -->
 <table border="0" width="100%">
-  <!-- Header -->
   <tr>
     <td align="center">
       <?php include 'libs/header.php'; ?>
     </td>
   </tr>
 
-  <!-- Navigation -->
   <tr>
     <td align="center">
       <?php include 'libs/navigation.php'; ?>
     </td>
   </tr>
 
-  <!-- Content Row -->
   <tr>
-    <!-- Menu Section -->
     <td>
       <h2>Delete Menu Item</h2>
       <table width="400" cellspacing="5">
         <form action="MenuDelete.php" method="POST">
-          <input type="hidden" name="id" value="<?= $row['id'] ?>";
+          <input type="hidden" name="id" value="<?= htmlspecialchars($row['id']) ?>">
           <tr>
             <th align="right">Name:</th>
-            <td></td>
+            <td><?= htmlspecialchars($row['name']) ?></td>
           </tr>
           <tr>
             <th align="right">Type:</th>
-            <td></td>
+            <td><?= htmlspecialchars($row['type']) ?></td>
           </tr>
           <tr>
             <th align="right">Price (RM):</th>
-            <td></td>
+            <td><?= number_format($row['price'], 2) ?></td>
           </tr>
           <tr>
             <td></td>
             <td>
               <input type="submit" name="task" value="Delete"> 
-              <input type="button" onclick="history.back()" value="Cancel">
+              <input type="submit" name="task" value="Cancel">
             </td>
           </tr>
         </form>
@@ -75,7 +87,6 @@ if ($task == "Delete" || $task == "Cancel") {
     </td>
   </tr>
 
-  <!-- Footer -->
   <tr>
     <td align="center">
       <?php include 'libs/footer.php'; ?>
