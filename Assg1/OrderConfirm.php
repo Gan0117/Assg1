@@ -1,20 +1,17 @@
-<!--
-Assignment 1, SCSM2223-25262 (OrderConfirm.php)
-Group Name: ???
--->
 <?php require 'libs/db_connect_PDO.php'; ?>
 <?php
-// Read order info from POST method
-$name = htmlspecialchars($_POST['name']);
-$email = htmlspecialchars($_POST['email']);
-$phone = htmlspecialchars($_POST['phone']);
-$food_id = $_POST['food_id'];
-$qtyFood = $_POST['qtyFood'];
-$drink_id = $_POST['drink_id'];
-$qtyDrink = $_POST['qtyDrink'];
-$delivery = $_POST['delivery'];
-$comments = htmlspecialchars($_POST['comments']);
+// Read order info from POST method safely
+$name = $_POST['name'] ?? '';
+$email = $_POST['email'] ?? '';
+$phone = $_POST['phone'] ?? '';
+$food_id = $_POST['food_id'] ?? '';
+$qtyFood = $_POST['qtyFood'] ?? '';
+$drink_id = $_POST['drink_id'] ?? '';
+$qtyDrink = $_POST['qtyDrink'] ?? '';
+$delivery = $_POST['delivery'] ?? '';
+$comments = $_POST['comments'] ?? '';
 
+// Prevent blank orders from bypassing the system
 if ($qtyFood == '' && $qtyDrink == '') {
     header("Location: OrderForm.php");
     exit;
@@ -22,41 +19,68 @@ if ($qtyFood == '' && $qtyDrink == '') {
 
 // User confirm to order
 if (isset($_POST['button']) && $_POST['button'] == "Confirm") {
-    // 1. Check by email if user is returned customer. If yes then just get user ID.
-    // 2. If user is a new customer then need to register user (use 'email' and 'phone' 
-    //    information as 'username' and 'password').
-    // 3. Save customer's order info into database.
+    
+    // Force PDO to throw exceptions on errors
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
     $user_id = -1;
     $order_id = -1;
     
     date_default_timezone_set('Asia/Kuala_Lumpur');
-    $date = new DateTime('now');
-    $datetime = $date->format('Y-m-d H:i:s');
-    
-    $stmt_userCheck = $pdo->prepare("SELECT * FROM users WHERE email=:email");
-    
-    //$stmt_userSave = $pdo->prepare("INSERT INTO users ???");
-                                        
-    //$stmt_orderSave = $pdo->prepare("INSERT INTO orders ???");
-                                 
-    $stmt_orderCheck = $pdo->prepare("SELECT * FROM orders WHERE user_id=:user_id AND datetime=:datetime");
-                                 
-    //$stmt_ordermenuSave = $pdo->prepare("INSERT INTO order_menus ???");
+    $datetime = date('Y-m-d H:i:s');
     
     try {
-      // ???
-         
+        // 1. Check for returning customer by email
+        $stmt_userCheck = $pdo->prepare("SELECT * FROM users WHERE email=:email");
+        $stmt_userCheck->execute(['email' => $email]);
+        
+        if ($user = $stmt_userCheck->fetch()) {
+            $user_id = $user['id'];
+        } else {
+            // Register new user (Phone as password, Email as username)
+            $stmt_userSave = $pdo->prepare("INSERT INTO users (name, email, phone, role, username, password) VALUES (:name, :email, :phone, 'CUSTOMER', :username, :password)");
+            $stmt_userSave->execute([
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone,
+                'username' => $email,
+                'password' => $phone
+            ]);
+            $user_id = $pdo->lastInsertId();
+        }
+
+        // 2. Save Order
+        $stmt_orderSave = $pdo->prepare("INSERT INTO orders (user_id, datetime, delivery, comments, status) VALUES (:user_id, :datetime, :delivery, :comments, 'New')");
+        $stmt_orderSave->execute([
+            'user_id' => $user_id,
+            'datetime' => $datetime,
+            'delivery' => $delivery,
+            'comments' => $comments
+        ]);
+        $order_id = $pdo->lastInsertId(); 
+
+        // 3. Save Order Menus
+        $stmt_ordermenuSave = $pdo->prepare("INSERT INTO order_menus (order_id, menu_id, qty) VALUES (:order_id, :menu_id, :qty)");
+        
+        if ($qtyFood != '' && $qtyFood > 0) {
+            $stmt_ordermenuSave->execute(['order_id' => $order_id, 'menu_id' => $food_id, 'qty' => $qtyFood]);
+        }
+        if ($qtyDrink != '' && $qtyDrink > 0) {
+            $stmt_ordermenuSave->execute(['order_id' => $order_id, 'menu_id' => $drink_id, 'qty' => $qtyDrink]);
+        }
+
+        // 4. Redirect automatically to Menu.php
+        header("Location: Menu.php");
+        exit;
+
     } catch (PDOException $ex) { 
-      echo "Database Error: " . $ex->getMessage();
+        die("<h2 style='color:red;'>CRITICAL DATABASE ERROR: " . $ex->getMessage() . "</h2>");
     }
-    
-    header("Location: Menu.php");
-    exit;
 }
 
 // Query selected food & drink for confirmation display
-$stmt_food = $pdo->prepare("SELECT * FROM menus WHERE id=$food_id");
-$stmt_drink = $pdo->prepare("SELECT * FROM menus WHERE id=$drink_id");
+$stmt_food = $pdo->prepare("SELECT * FROM menus WHERE id=:id");
+$stmt_drink = $pdo->prepare("SELECT * FROM menus WHERE id=:id");
 
 $foodPrice = 0;
 $drinkPrice = 0;
@@ -66,12 +90,25 @@ $food = NULL;
 $drink = NULL;
 
 try {
-  // ???
+    if ($food_id) {
+        $stmt_food->execute(['id' => $food_id]);
+        if ($food = $stmt_food->fetch()) {
+            $foodPrice = ($qtyFood != '') ? $food['price'] * $qtyFood : 0;
+        }
+    }
+
+    if ($drink_id) {
+        $stmt_drink->execute(['id' => $drink_id]);
+        if ($drink = $stmt_drink->fetch()) {
+            $drinkPrice = ($qtyDrink != '') ? $drink['price'] * $qtyDrink : 0;
+        }
+    }
+
+    $totalPrice = $foodPrice + $drinkPrice;
   
 } catch (PDOException $ex) { 
   echo "Database Error: " . $ex->getMessage();
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -84,25 +121,20 @@ try {
 
 <body>
 
-<!-- Main Layout Table -->
 <table border="0" width="100%">
-  <!-- Header -->
   <tr>
     <td align="center">
         <?php include 'libs/header.php'; ?>
     </td>
   </tr>
 
-  <!-- Navigation -->
   <tr>
     <td align="center">
         <?php include 'libs/navigation.php'; ?>
     </td>
   </tr>
 
-  <!-- Content Row -->
   <tr>
-    <!-- Order Form Section -->
     <td>
       <form action="OrderConfirm.php" method="POST">
         <h2>Please Confirm Your Order</h2>
@@ -112,19 +144,19 @@ try {
         <table cellpadding="3">
           <tr>
             <th align="right">Name: </th>
-            <td>???</td>
+            <td><?= htmlspecialchars($name) ?></td>
           </tr>
           <tr>
             <th align="right">Email: </th>
-            <td>???</td>
+            <td><?= htmlspecialchars($email) ?></td>
           </tr>
           <tr>
             <th align="right">Phone Number: </th>
-            <td>???</td>
+            <td><?= htmlspecialchars($phone) ?></td>
           </tr>
           <tr>
             <th align="right">Delivery Option: </th>
-            <td>???</td>
+            <td><?= htmlspecialchars($delivery) ?></td>
           </tr>
         <tr>
           <th align="right">Date-Time: </th>
@@ -142,15 +174,15 @@ try {
           </tr>
 <?php if ($qtyFood != '') { ?>
           <tr>
-            <td align="center"><?= $qtyFood ?></td>
-            <td>???</td>
+            <td align="center"><?= htmlspecialchars($qtyFood) ?></td>
+            <td><?= htmlspecialchars($food['name'] ?? '') ?></td>
             <td align="right"><?= number_format($foodPrice, 2) ?></td>
           </tr>
 <?php } ?>
 <?php if ($qtyDrink != '') { ?>
           <tr>
-            <td align="center"><?= $qtyDrink ?></td>
-            <td>???</td>
+            <td align="center"><?= htmlspecialchars($qtyDrink) ?></td>
+            <td><?= htmlspecialchars($drink['name'] ?? '') ?></td>
             <td align="right"><?= number_format($drinkPrice, 2) ?></td>
           </tr>
 <?php } ?>          
@@ -175,8 +207,18 @@ try {
         </table>
         
         <p>
-          <b>Additional Comments: </b><i><?= $comments ?></i>
+          <b>Additional Comments: </b><i><?= htmlspecialchars($comments) ?></i>
         </p>
+
+        <input type="hidden" name="name" value="<?= htmlspecialchars($name) ?>">
+        <input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
+        <input type="hidden" name="phone" value="<?= htmlspecialchars($phone) ?>">
+        <input type="hidden" name="food_id" value="<?= htmlspecialchars($food_id) ?>">
+        <input type="hidden" name="qtyFood" value="<?= htmlspecialchars($qtyFood) ?>">
+        <input type="hidden" name="drink_id" value="<?= htmlspecialchars($drink_id) ?>">
+        <input type="hidden" name="qtyDrink" value="<?= htmlspecialchars($qtyDrink) ?>">
+        <input type="hidden" name="delivery" value="<?= htmlspecialchars($delivery) ?>">
+        <input type="hidden" name="comments" value="<?= htmlspecialchars($comments) ?>">
 
         <p>
           <input type="submit" name="button" value="Confirm">
@@ -186,7 +228,6 @@ try {
     </td>
   </tr>
 
-  <!-- Footer -->
   <tr>
     <td colspan="2" align="center">
       <?php include 'libs/footer.php'; ?>
@@ -197,19 +238,10 @@ try {
 </html>
 
 <script>
-// Function to update the display
 function updateClock() {
     const now = new Date();
-    // Format: "MM/DD/YYYY, HH:MM:SS AM/PM" (varies by locale)
-    const liveTime = now.toLocaleString(); 
-    
-    // Update the HTML element with id="clock"
-    document.getElementById('clock').textContent = liveTime;
+    document.getElementById('clock').textContent = now.toLocaleString(); 
 }
-
-// Call the function every 1000 milliseconds (1 second)
 setInterval(updateClock, 1000);
-
-// Initial call to prevent 1-second delay on page load
 updateClock();
 </script>
