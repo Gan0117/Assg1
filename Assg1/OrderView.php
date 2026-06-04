@@ -1,6 +1,6 @@
 <!--
 Assignment 1, SCSM2223-25262 (OrderView.php)
-Group Name: ???
+Group Name: DNF
 -->
 <?php require 'libs/authpage.php'; ?>
 <?php require 'libs/db_connect_PDO.php'; ?>
@@ -18,16 +18,31 @@ $statusMap = [
 ];
 
 // Construct the SQL to get user info and ordered menus from the database
-//$stmtOrder = $pdo->prepare("SELECT ???");
+$stmtOrder = $pdo->prepare("SELECT orders.*, users.name, users.phone 
+                            FROM orders 
+                            JOIN users ON orders.user_id = users.id 
+                            WHERE orders.id = :id");
                            
-//$stmtMenu = $pdo->prepare("SELECT ???");
+$stmtMenu = $pdo->prepare("SELECT order_menus.qty, menus.name, menus.price 
+                           FROM order_menus 
+                           JOIN menus ON order_menus.menu_id = menus.id 
+                           WHERE order_menus.order_id = :id");
 
 // Construct the SQL to get user info and ordered menus from the database                           
 $stmtStatusSave = $pdo->prepare("UPDATE orders SET status=:status WHERE id=:id");
   
 try {
-  // ???
+  $stmtOrder->execute(['id' => $_GET['id']]);
+  $order = $stmtOrder->fetch();
   
+  if ($changeStatus != "") {
+      $newStatus = $statusMap[$order['status']][$changeStatus];
+      $stmtStatusSave->execute(['status' => $newStatus, 'id' => $_GET['id']]);
+      $order['status'] = $newStatus;
+  }
+
+  $stmtMenu->execute(['id' => $_GET['id']]);
+
   //echo $stmtOrder->debugDumpParams();
   //echo $stmtMenu->debugDumpParams();
   //echo $stmtStatusSave->debugDumpParams();
@@ -72,25 +87,25 @@ try {
       <table cellpadding="3">
         <tr>
           <th align="right">Name: </th>
-          <td>???</td>
+          <td><?= $order['name'] ?></td>
         </tr>
         <tr>
           <th align="right">Phone Number: </th>
-          <td>???</td>
+          <td><?= $order['phone'] ?></td>
         </tr>
         <tr>
           <th align="right">Delivery Option: </th>
-          <td>???</td>
+          <td><?= $order['delivery'] ?></td>
         </tr>
         <tr>
           <th align="right">Date-Time: </th>
-          <td>???</td>
+          <td><?= $order['datetime'] ?></td>
         </tr>
         <tr>
           <th align="right">Status: </th>
           <td>
             <a href="OrderView.php?changeStatus=prev&id=<?= $_GET['id'] ?>">&lt;&lt;</a> 
-            [ ??? ] 
+            [ <?= $order['status'] ?> ] 
             <a href="OrderView.php?changeStatus=next&id=<?= $_GET['id'] ?>">&gt;&gt;</a>
           </td>
         </tr>
@@ -104,11 +119,15 @@ try {
         </tr>
 <?php 
 $totalPrice = 0;
+while ($menu = $stmtMenu->fetch()) { 
+    $itemPrice = $menu['qty'] * $menu['price'];
+    $totalPrice += $itemPrice;
 ?>
         <tr>
-          <td align="center">???</td>
-          <td>???</td>
-          <td align="right">???</td>
+          <td align="center"><?= $menu['qty'] ?></td>
+          <td><?= $menu['name'] ?></td>
+          <td align="right"><?= number_format($itemPrice, 2) ?></td>
+<?php } ?>
         <tr>
           <td colspan="3">&nbsp;</td>
         </tr>
@@ -126,7 +145,7 @@ $totalPrice = 0;
         </tr> 
       </table>
       
-      <p><i>???</i></p>
+      <p><i><?= $order['comments'] ?></i></p>
     </td>
   </tr>
 
