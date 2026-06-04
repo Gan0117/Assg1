@@ -1,6 +1,6 @@
 <!--
 Lab2, SCSM2223-25262 (MenuDelete.php)
-Group Name: ???
+Group Name: DNF
 -->
 <?php require 'libs/authpage.php'; ?>
 <?php require 'libs/db_connect_PDO.php'; ?>

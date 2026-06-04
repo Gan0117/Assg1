@@ -1,12 +1,19 @@
 <!--
 Assignment 1, SCSM2223-25262 (OrderList.php)
-Group Name: ???
+Group Name: DNF
 -->
 <?php require 'libs/authpage.php'; ?>
 <?php require 'libs/db_connect_PDO.php'; ?>
 <?php
 $keywordOrder = "";
+if (isset($_POST['keywordOrder'])) {
+    $keywordOrder = $_POST['keywordOrder'];
+}
+
 $sortOrder = "datetime desc"; // default sort order is datetime, descending 
+if (isset($_GET['sortOrder'])) {
+    $sortOrder = $_GET['sortOrder'];
+}
 
 // Assume that no field is being selected to sort the menu rows
 $sortFields = ['datetime desc'=>'', 'name'=>'', 'delivery'=>'', 'phone'=>''];
@@ -15,10 +22,18 @@ $sortFields = ['datetime desc'=>'', 'name'=>'', 'delivery'=>'', 'phone'=>''];
 $sortFields[$sortOrder] = "***";
 
 // Construct the SQL to list customer'a orders based on $keywordOrder and $sortOrder variable
-$stmt = $pdo->prepare("SELECT * FROM orders ORDER BY $sortOrder");
+$stmt = $pdo->prepare("SELECT orders.*, users.name, users.phone, 
+                              (SELECT COUNT(*) FROM order_menus WHERE order_id = orders.id) AS menu_ordered
+                        FROM orders 
+                        JOIN users ON orders.user_id = users.id 
+                        WHERE users.name LIKE :keyword 
+                          OR users.phone LIKE :keyword 
+                          OR orders.delivery LIKE :keyword 
+                          OR orders.status LIKE :keyword
+                        ORDER BY $sortOrder");
   
 try {
-  $stmt->execute();
+  $stmt->execute(['keyword' => "%$keywordOrder%"]);
   //echo $stmt->debugDumpParams();
 } catch (PDOException $ex) {
   echo "Database Error: " . $ex->getMessage();
@@ -83,10 +98,10 @@ while ($row = $stmt->fetch()) {
           <td align="center"><?= $no ?></td>
           <td align="center"><?= $row['id'] ?></td>
           <td align="center"><?= $row['datetime'] ?></td>
-          <td>???</td>
+          <td><?= $row['name'] ?></td>
           <td><?= $row['delivery'] ?></td>
-          <td>???</td>
-          <td align="center">???</td>
+          <td><?= $row['phone'] ?></td>
+          <td align="center"><?= $row['menu_ordered'] ?></td>
           <td align="center"><?= $row['status'] ?></td>
           <td align="center">
             <a href="OrderView.php?id=<?= $row['id'] ?>&task=">View</a>
