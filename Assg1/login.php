@@ -1,4 +1,7 @@
-<?php require 'libs/db_connect_PDO.php'; ?>
+<?php 
+session_start();
+require 'libs/db_connect_PDO.php';
+?>
 <?php 
 // User try to login
 if (isset($_POST['username'])) {
@@ -27,6 +30,7 @@ if (isset($_POST['username'])) {
     } else if ($user && $user['role'] == 'CUSTOMER') {
       setcookie("username", $username, time() + 900); 
       setcookie("role", $user['role'], time() + 900);
+      $_SESSION['email'] = $user['email'];
       header("Location: OrderForm.php");
       exit;
     }

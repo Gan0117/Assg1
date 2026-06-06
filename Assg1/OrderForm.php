@@ -2,7 +2,10 @@
 Assignment 1, SCSM2223-25262 (OrderForm.php)
 Group Name: DNF
 -->
-<?php require 'libs/db_connect_PDO.php'; ?>
+<?php
+session_start();
+require 'libs/db_connect_PDO.php';
+?>
 
 <?php
 // Check for returned customer
@@ -11,8 +14,8 @@ $email = "";
 $phone = "";
 
 
-if (isset($_GET['email'])) {
-    $email = $_GET['email'];
+if (isset($_SESSION['email'])) {
+    $email = $_SESSION['email'];
     try {
         $stmt_user = $pdo->prepare("SELECT * FROM users WHERE email=:email");
         $stmt_user->execute(['email' => $email]);
@@ -75,15 +78,15 @@ try {
         <table cellpadding="3">
           <tr>
             <td align="right">Name: </td>
-            <td><input type="text" name="name" size="30" value="" required></td>
+            <td><input type="text" name="name" size="30" value="<?= htmlspecialchars($name) ?>" required></td>
           </tr>
           <tr>
             <td align="right">Email: </td>
-            <td><input type="text" name="email" size="20" value="" required></td>
+            <td><input type="text" name="email" size="20" value="<?= htmlspecialchars($email) ?>" required></td>
           </tr>
           <tr>
             <td align="right">Phone Number: </td>
-            <td><input type="text" name="phone" size="20" value="" required></td>
+            <td><input type="text" name="phone" size="20" value="<?= htmlspecialchars($phone) ?>" required></td>
           </tr>
         </table>
         <br><hr>
